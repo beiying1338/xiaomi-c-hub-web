@@ -17,14 +17,31 @@
 
 > 固件升级功能**有意未实现**：刷写有变砖风险，升级请使用官方应用。
 
+## 两种用法
+
+| 模式 | 页面 | 要求 | 适合 |
+|---|---|---|---|
+| **WebHID 直连** | `webhid.html`（Pages 版首页） | Chrome/Edge，音箱插在**本机** | 零安装、零后端，打开网页即用 |
+| **本地桥接** | `index.html`（`npm start` 同源） | Node.js + USB | 功能等同，适合服务器/NAS 常驻 |
+
+GitHub Pages 上托管的就是 WebHID 版：**[打开在线控制面板](https://beiying1338.github.io/xiaomi-c-hub-web/)** → 点「连接音箱」→ 浏览器弹授权框 → 完成。浏览器会把授权记住，下次打开自动重连。
+
 ## 架构
 
 ```
+WebHID 直连（Pages 版）:
+┌─ 浏览器 (Chrome/Edge) ─┐
+│  webhid.html            │──HID feature report──▶ ┌─ 音箱 ─┐
+└─────────────────────────┘       WebUSB/HID        │  B03   │
+                                                    └────────┘
+
+桥接模式:
 ┌─ 浏览器 ─────────────┐      ┌─ 本地桥接 (server.mjs) ─┐      ┌─ 音箱 ─┐
 │  静态 UI（任意托管）  │─HTTP─│  node-hid feature report │─USB─│ B03    │
 └──────────────────────┘      └──────────────────────────┘      └────────┘
 ```
 
+- **WebHID 直连**：`public/webhid.html` 纯前端，Chrome 89+ 直接与 iface 4 通信（`navigator.hid`，feature report 与 node-hid 完全同构）。
 - **本地/内网**：桥接服务同源托管 UI，直接用。
 - **远程**：UI 托管到 Cloudflare Workers，`/api` 由 Worker 反代到家里通过 Cloudflare Tunnel 暴露的桥接服务。
 

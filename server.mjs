@@ -71,8 +71,8 @@ function parseState(buf) {
     const n = data[i + 1];
     if (n === 1) {
       let v = data[i + 2];
-      if (id === 49) v = Math.round(v * 10);        // brightness 0-10 → 0-100
-      else if (id === 116) v = v === 16 ? 100 : Math.round(v * 6); // volume 0-16 → 0-100
+      if (id === 49) v = Math.min(100, v * 10);                      // brightness 0-10 → 0-100
+      else if (id === 116) v = v === 16 ? 100 : Math.min(100, v * 6); // volume 0-16 → 0-100
       cfg[PARAM_NAMES[id]] = v;
       i += 2;
     } else if (id === 140 || id === 133) {
@@ -207,7 +207,11 @@ const server = createServer(async (req, res) => {
       }
       const cmd = map[key];
       if (!cmd) { res.writeHead(400); return res.end(JSON.stringify({ error: 'unknown key' })); }
-      const out = await speaker.write(cmd, value);
+      // UI sliders send percent (0-100); device params use smaller scales
+      const SCALE = { volume: 16, light: 10, sleepValue: 16, standbyValue: 16, channelPrompt: 16, colorFlowRate: 16, breathingSpeed: 16 };
+      let v = value;
+      if (key in SCALE) v = Math.max(0, Math.min(SCALE[key], Math.round(Number(value) * SCALE[key] / 100)));
+      const out = await speaker.write(cmd, v);
       return res.end(JSON.stringify(out));
     } catch (e) {
       res.writeHead(400);

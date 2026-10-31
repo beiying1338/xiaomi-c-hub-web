@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xiaomi C-HUB Web · 音箱驱动管理 (WebHID 直连版)</title>
+<style>
+:root {
+  --bg: #0b0b0d; --card: #16161a; --card2: #1d1d22; --line: #2a2a31;
+  --tx: #f2f2f4; --tx2: #9b9ba4; --acc: #ff6900; --acc2: #0071e6; --ok: #34c759; --bad: #ff453a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--tx); font-family: MiSans, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
+header { display: flex; align-items: center; gap: 14px; padding: 6px 2px 22px; }
+.logo { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #ff6900, #ff9500); display: grid; place-items: center; font-weight: 700; font-size: 18px; color: #fff; }
+h1 { font-size: 20px; font-weight: 500; }
+.sub { color: var(--tx2); font-size: 12.5px; margin-top: 3px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); display: inline-block; margin-right: 7px; box-shadow: 0 0 8px var(--bad); }
+.dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.grid { display: grid; grid-template-columns: 340px 1fr; gap: 18px; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 18px; }
+.card h2 { font-size: 15px; font-weight: 500; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+.kv { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
+.kv:last-child { border-bottom: 0; }
+.kv b { font-weight: 500; }
+.kv span { color: var(--tx2); }
+.tag { padding: 2px 9px; border-radius: 20px; font-size: 11.5px; background: var(--card2); color: var(--tx2); }
+.vol-row { display: flex; align-items: center; gap: 14px; margin: 10px 0 4px; }
+.vol-num { font-size: 30px; font-weight: 500; width: 62px; text-align: right; }
+input[type=range] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 4px; background: var(--card2); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; cursor: pointer; box-shadow: 0 1px 6px #0008; }
+.seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.seg button { flex: 1; min-width: 86px; padding: 10px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--tx2); cursor: pointer; font-size: 13px; font-family: inherit; }
+.seg button.on { border-color: var(--acc); color: var(--acc); background: #ff690014; }
+.row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; font-size: 13.5px; }
+.row + .row { border-top: 1px dashed var(--line); }
+.switch { position: relative; width: 44px; height: 26px; background: var(--card2); border: 1px solid var(--line); border-radius: 20px; cursor: pointer; transition: .2s; flex: none; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: .2s; }
+.switch.on { background: var(--ok); border-color: var(--ok); }
+.switch.on::after { left: 20px; }
+.fx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fx { border: 1px solid var(--line); border-radius: 14px; background: var(--card2); padding: 12px 8px; text-align: center; cursor: pointer; font-size: 12.5px; color: var(--tx2); }
+.fx.on { border-color: var(--acc); color: var(--tx); background: #ff690014; }
+.fx .sw { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 8px; }
+.slider-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 13px; gap: 16px; }
+.slider-row input { flex: 1; }
+.slider-row .v { width: 34px; text-align: right; color: var(--tx2); }
+.eq-wrap { display: flex; gap: 12px; justify-content: space-between; padding: 10px 4px 2px; }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; }
+.eq-band input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 6px; height: 150px; }
+.eq-band label { font-size: 10.5px; color: var(--tx2); white-space: nowrap; }
+.eq-band .val { font-size: 11px; color: var(--acc); min-height: 14px; }
+.btn { padding: 10px 18px; border-radius: 12px; border: 0; background: var(--acc2); color: #fff; cursor: pointer; font-family: inherit; font-size: 13.5px; }
+.btn.gray { background: var(--card2); color: var(--tx); border: 1px solid var(--line); }
+.btn.warn { background: #ff453a22; color: var(--bad); border: 1px solid #ff453a55; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.console { background: #0a0a0c; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: 11px/1.7 Consolas, monospace; color: #7ee787; max-height: 210px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(80px); background: #2c2c31; padding: 10px 22px; border-radius: 24px; font-size: 13.5px; opacity: 0; transition: .25s; z-index: 9; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.mut { color: var(--tx2); font-size: 12px; line-height: 1.6; }
+.banner { background: #ff690014; border: 1px solid #ff690055; border-radius: 14px; padding: 14px 18px; margin-bottom: 18px; font-size: 13.5px; line-height: 1.7; }
+.banner b { color: var(--acc); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">C·H</div>
+    <div>
+      <h1>Xiaomi C-HUB <span style="color:var(--tx2);font-size:13px">Web 驱动管理 · WebHID 直连版</span></h1>
+      <div class="sub"><span class="dot" id="dot"></span><span id="devname">未连接 — 音箱需插在<b>这台电脑</b>上</span></div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner">
+    本页面通过浏览器的 <b>WebHID</b> 直接控制 USB 音箱，<b>不经任何服务器</b>。要求 Chrome / Edge 89+，且页面以 HTTPS 打开（GitHub Pages 满足）。
+    <span id="compat" class="mut"></span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>设备信息</h2>
+        <div class="kv"><span>型号</span><b id="model">—</b></div>
+        <div class="kv"><span>固件 (BT)</span><b id="fwbt">—</b></div>
+        <div class="kv"><span>发射模块 (TX)</span><b id="fwtx">—</b></div>
+        <div class="kv"><span>低音炮 (RX)</span><b id="fwrx">—</b></div>
+        <div class="kv"><span>低音炮连接</span><b id="rxconn">—</b></div>
+        <div class="kv"><span>协议</span><b>HID Feature · A5 5A FC</b></div>
+        <div style="margin-top:14px" class="btns">
+          <button class="btn" id="btnConnect">连接音箱</button>
+          <button class="btn gray" id="btnRefresh">刷新</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>通道与音量</h2>
+        <div class="seg" id="chanSeg">
+          <button data-v="0">USB 通道</button>
+          <button data-v="1">蓝牙通道</button>
+          <button data-v="2">AUX IN 通道</button>
+        </div>
+        <div class="vol-row">
+          <input type="range" id="vol" min="0" max="100" value="50">
+          <div class="vol-num" id="volNum">50</div>
+        </div>
+        <div class="row"><span>通道提示音</span><div class="switch" id="sw-chPromptFlag"></div></div>
+        <div class="slider-row"><span>提示音大小</span><input type="range" id="chPrompt" min="0" max="100"><span class="v" id="chPromptV"></span></div>
+        <div class="row"><span>低音炮独立音量开关</span><div class="switch" id="sw-mix"></div></div>
+      </div>
+
+      <div class="card">
+        <h2>电源管理</h2>
+        <div class="row"><span>睡眠</span><div class="switch" id="sw-sleep"></div></div>
+        <div class="slider-row"><span>睡眠时长</span><input type="range" id="sleepV" min="0" max="100"><span class="v" id="sleepVV"></span></div>
+        <div class="row"><span>待机</span><div class="switch" id="sw-standby"></div></div>
+        <div class="slider-row"><span>待机时长</span><input type="range" id="standbyV" min="0" max="100"><span class="v" id="standbyVV"></span></div>
+        <div class="row"><span>开机/关机提示音</span><div class="switch" id="sw-pn"></div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>RGB 灯效 <span class="tag">RGB 灯效</span></h2>
+        <div class="row" style="padding-top:0"><span>灯效开关</span><div class="switch" id="sw-rgb"></div></div>
+        <div class="fx-grid" id="fxGrid"></div>
+        <div class="slider-row" style="margin-top:10px"><span>亮度</span><input type="range" id="light" min="0" max="100"><span class="v" id="lightV"></span></div>
+        <div class="slider-row"><span>色彩流动速度</span><input type="range" id="flow" min="0" max="100"><span class="v" id="flowV"></span></div>
+        <div class="slider-row"><span>呼吸速度</span><input type="range" id="breath" min="0" max="100"><span class="v" id="breathV"></span></div>
+        <div class="slider-row"><span>律动灵敏度/流动速率</span><input type="range" id="agility" min="0" max="100"><span class="v" id="agilityV"></span></div>
+        <div class="row"><span>律动颜色</span>
+          <div class="seg" id="syldSeg" style="flex:unset">
+            <button data-v="0" style="min-width:64px">五彩</button>
+            <button data-v="1" style="min-width:64px">彩虹</button>
+            <button data-v="2" style="min-width:64px">天空</button>
+          </div>
+        </div>
+        <div class="row"><span>灯效提示音</span><div class="switch" id="sw-ltone"></div></div>
+      </div>
+
+      <div class="card">
+        <h2>音效 <span class="tag">均衡器</span></h2>
+        <div class="mut" style="margin-bottom:10px">选择一个音效设置或自定义音效设置（音量接近最大时，调音效果会减弱）</div>
+        <div class="seg" id="eqSeg">
+          <button data-v="0">标准</button>
+          <button data-v="1">强劲低音</button>
+          <button data-v="2">纯净人声</button>
+          <button data-v="3">游戏模式</button>
+          <button data-v="4">影院模式</button>
+        </div>
+        <div class="eq-wrap" id="eqWrap"></div>
+        <div style="text-align:center" class="mut">31 · 62 · 125 · 250 · 500 · 1k · 2k · 4k · 8k · 16k Hz（±6 dB）</div>
+      </div>
+
+      <div class="card">
+        <h2>系统</h2>
+        <div class="btns">
+          <button class="btn" id="btnRestart">重启音箱</button>
+          <button class="btn warn" id="btnReset">恢复出厂设置</button>
+        </div>
+        <div class="mut" style="margin-top:10px">固件升级请使用官方 Xiaomi C-HUB（刷写有变砖风险，此处不提供）。</div>
+      </div>
+
+      <div class="card">
+        <h2>协议控制台 <span class="tag">TX/RX 实时帧</span></h2>
+        <div class="console" id="con">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+// ================= WebHID direct driver — A5 5A FC protocol =================
+const VID = 0x2717;
+const PIDS = [0xd003, 0xd004, 0xd007, 0xd008, 0xd009, 0xd00a, 0xd00b, 0xd00c];
+const ETX = 0x16;
+const CMD = { LIGHT_EFFECT:48, LIGHT_BRIGHTNESS:49, LIGHT_TONE:50, RGB_FLAG:52, EQ_INDEX:64, SOUND_TONE:65,
+  VOLUME:116, SLEEP_FLAG:128, SLEEP_VALUE:129, STANDBY_FLAG:131, STANDBY_VALUE:132,
+  CHANNEL:133, CHANNEL_TONE_FLAG:134, CHANNEL_TONE:135, AGILITY_COLOR:136, SYLD_COLOR:137,
+  COLOR_FLOW:138, BREATHING:139, EQ_BANDS:140, POWER_NOTICE:142, MIX_LINE:143 };
+const NAMES = { 48:'lightEffectIndex',49:'light',50:'lightToneFlag',52:'rgbLightFlag',64:'equalizerIndex',65:'soundToneFlag',
+  113:'BTVersion',116:'volume',117:'electricity',119:'TXVersion',120:'RXVersion',121:'RXConnectStatus',
+  128:'sleepFlag',129:'sleepValue',131:'standbyFlag',132:'standbyValue',133:'channelStatus',134:'channelPromptFlag',
+  135:'channelPrompt',136:'agilityOrColorFlag',137:'syldColorIndex',138:'colorFlowRate',139:'breathingSpeed',
+  140:'equalizerHZsValue',142:'powerNoticeFlag',143:'mixLineChannelFlag' };
+const SCALE = { volume:16, light:10, sleepValue:16, standbyValue:16, channelPrompt:16, colorFlowRate:16, breathingSpeed:16 };
+const hexs = (b) => [...b].map((x) => x.toString(16).padStart(2, '0')).join(' ');
+
+const frame = (payload) => [0xa5, 0x5a, 0xfc, payload.length, ...payload, ETX];
+const qState = () => frame([0x90, 3, 0]);
+const wVal = (cmd, v) => frame([cmd, 2, v & 0xff]);
+const wEQ = (vals) => frame([CMD.EQ_BANDS, 2, 10, ...vals.map((v) => (v + 6) & 0xff)]);
+
+function parseState(buf) {
+  let s = 0;
+  if (buf[0] === 0x00) s = 1;               // report id prefix
+  if (buf[s] !== 0xa5 || buf[s+1] !== 0x5a || buf[s+2] !== 0xfc) return null;
+  const len = buf[s+3];
+  const d = buf.slice(s + 6, s + 6 + len);
+  const cfg = {};
+  for (let i = 0; i < d.length - 2; i++) {
+    const id = d[i];
+    if (!(id in NAMES)) continue;
+    const n = d[i + 1];
+    if (n === 1) {
+      let v = d[i + 2];
+      if (id === 49) v = Math.min(100, v * 10);
+      else if (id === 116) v = v === 16 ? 100 : Math.min(100, v * 6);
+      cfg[NAMES[id]] = v;
+      i += 2;
+    } else if (id === 140 || id === 133) {
+      const vals = [...d.slice(i + 2, i + 2 + n)];
+      if (id === 140) cfg.equalizerHZsValue = vals.map((x) => x - 6);
+      else { cfg.channelStatus = vals; cfg.channel = vals.findIndex((x) => x === 2); }
+      i += 1 + n;
+    }
+  }
+  return cfg;
+}
+
+let device = null, queue = Promise.resolve(), cfg = null, suppress = false;
+const transact = (frameArr) => (queue = queue.then(async () => {
+  if (!device || !device.opened) return { error: 'not connected' };
+  try {
+    await device.sendFeatureReport(0, new Uint8Array(frameArr));
+    const dv = await device.receiveFeatureReport(0, 129);
+    const body = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    console.log('[tx]', hexs(frameArr), '\n[rx]', hexs(body.subarray(0, 96)));
+    logLine('tx', hexs(frameArr)); logLine('rx', hexs(body.subarray(0, 64)) + (body.length > 64 ? ' …' : ''));
+    return body;
+  } catch (e) { return { error: String(e.message || e) }; }
+}));
+
+async function readState() {
+  const r = await transact(qState());
+  if (r.error) return r;
+  const c = parseState(r);
+  if (c) cfg = c;
+  return c || { error: 'unparsable', hex: hexs(r.subarray(0, 24)) };
+}
+async function setParam(key, deviceVal) {
+  const map = { lightEffectIndex:CMD.LIGHT_EFFECT, light:CMD.LIGHT_BRIGHTNESS, lightToneFlag:CMD.LIGHT_TONE,
+    rgbLightFlag:CMD.RGB_FLAG, equalizerIndex:CMD.EQ_INDEX, soundToneFlag:CMD.SOUND_TONE, volume:CMD.VOLUME,
+    sleepFlag:CMD.SLEEP_FLAG, sleepValue:CMD.SLEEP_VALUE, standbyFlag:CMD.STANDBY_FLAG, standbyValue:CMD.STANDBY_VALUE,
+    channel:CMD.CHANNEL, channelPromptFlag:CMD.CHANNEL_TONE_FLAG, channelPrompt:CMD.CHANNEL_TONE,
+    agilityOrColorFlag:CMD.AGILITY_COLOR, syldColorIndex:CMD.SYLD_COLOR, colorFlowRate:CMD.COLOR_FLOW,
+    breathingSpeed:CMD.BREATHING, powerNoticeFlag:CMD.POWER_NOTICE, mixLineChannelFlag:CMD.MIX_LINE };
+  const r = await transact(wVal(map[key], deviceVal));
+  const c = r.error ? r : (parseState(r) || { ok: true });
+  if (!c.error) cfg = { ...cfg, ...c };
+  return c;
+}
+
+// ================= UI =================
+const $ = (s) => document.querySelector(s);
+const FX = [
+  { id:1, name:'拾音律动 2.0', c:'linear-gradient(135deg,#ff2d55,#ff9500)' },
+  { id:2, name:'时尚霓虹 2.0', c:'linear-gradient(135deg,#5e5ce6,#30d158,#64d2ff)' },
+  { id:3, name:'星空闪烁', c:'radial-gradient(circle at 30% 30%,#fff 2%,#5e5ce6 30%,#0a0a20 90%)' },
+  { id:4, name:'梦幻极光 2.0', c:'linear-gradient(135deg,#64d2ff,#5e5ce6,#ff2d55)' },
+  { id:5, name:'温暖炉火 2.0', c:'linear-gradient(135deg,#ff9500,#ff453a,#7a1c00)' },
+  { id:6, name:'纯色呼吸 2.0', c:'radial-gradient(circle,#ffffff55,#ffffff18)' },
+];
+const EQ_HZ = ['31','62','125','250','500','1k','2k','4k','8k','16k'];
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800); }
+function logLine(dir, text) {
+  const c = $('#con'); const d = document.createElement('div');
+  d.textContent = `${new Date().toLocaleTimeString('zh-CN',{hour12:false})} ${dir.toUpperCase()} ${text}`;
+  c.prepend(d); while (c.childElementCount > 120) c.lastChild.remove();
+}
+function setSwitch(el, on) { el.classList.toggle('on', !!on); }
+
+$('#fxGrid').innerHTML = FX.map((f) => `<div class="fx" data-v="${f.id}"><div class="sw" style="background:${f.c}"></div>${f.name}</div>`).join('');
+$('#eqWrap').innerHTML = EQ_HZ.map((hz, i) => `<div class="eq-band"><div class="val" id="eqv${i}">0</div><input type="range" id="eq${i}" min="-6" max="6" value="0"><label>${hz} Hz</label></div>`).join('');
+if (!navigator.hid) $('#compat').innerHTML = '<br>⚠️ 当前浏览器不支持 WebHID（Firefox/Safari 不支持）—— 请用 Chrome 或 Edge。';
+
+function applyState(c) {
+  cfg = c; suppress = true;
+  $('#dot').classList.add('on');
+  $('#devname').textContent = 'REDMI 电脑音箱 2 Pro · 已连接（WebHID）';
+  $('#model').textContent = 'REDMI 电脑音箱 2 Pro (B03)';
+  $('#fwbt').textContent = 'V' + c.BTVersion;
+  $('#fwtx').textContent = 'V' + (c.TXVersion ?? 0);
+  $('#fwrx').textContent = c.RXVersion ? 'V' + c.RXVersion : '—';
+  $('#rxconn').innerHTML = c.RXConnectStatus ? '<span style="color:var(--ok)">已连接</span>' : '<span style="color:var(--tx2)">未连接</span>';
+  const set = (id, v) => { $(id).value = v ?? 0; };
+  set('#vol', c.volume); $('#volNum').textContent = c.volume ?? 0;
+  set('#light', c.light); $('#lightV').textContent = c.light ?? 0;
+  set('#flow', c.colorFlowRate); $('#flowV').textContent = c.colorFlowRate ?? 0;
+  set('#breath', c.breathingSpeed); $('#breathV').textContent = c.breathingSpeed ?? 0;
+  set('#agility', c.agilityOrColorFlag); $('#agilityV').textContent = c.agilityOrColorFlag ?? 0;
+  set('#chPrompt', c.channelPrompt); $('#chPromptV').textContent = c.channelPrompt ?? 0;
+  set('#sleepV', c.sleepValue); $('#sleepVV').textContent = c.sleepValue ?? 0;
+  set('#standbyV', c.standbyValue); $('#standbyVV').textContent = c.standbyValue ?? 0;
+  setSwitch($('#sw-rgb'), c.rgbLightFlag); setSwitch($('#sw-ltone'), c.lightToneFlag);
+  setSwitch($('#sw-chPromptFlag'), c.channelPromptFlag); setSwitch($('#sw-mix'), c.mixLineChannelFlag);
+  setSwitch($('#sw-sleep'), c.sleepFlag); setSwitch($('#sw-standby'), c.standbyFlag); setSwitch($('#sw-pn'), c.powerNoticeFlag);
+  document.querySelectorAll('#fxGrid .fx').forEach((el) => el.classList.toggle('on', +el.dataset.v === c.lightEffectIndex));
+  document.querySelectorAll('#eqSeg button').forEach((el) => el.classList.toggle('on', +el.dataset.v === c.equalizerIndex));
+  document.querySelectorAll('#chanSeg button').forEach((el) => el.classList.toggle('on', +el.dataset.v === c.channel));
+  document.querySelectorAll('#syldSeg button').forEach((el) => el.classList.toggle('on', +el.dataset.v === c.syldColorIndex));
+  (c.equalizerHZsValue || [0,0,0,0,0,0,0,0,0,0]).forEach((v, i) => { $('#eq'+i).value = v; $('#eqv'+i).textContent = (v > 0 ? '+' : '') + v; });
+  suppress = false;
+}
+async function act(key, percent, label) {
+  const scale = SCALE[key];
+  const dv = scale ? Math.max(0, Math.min(scale, Math.round(percent * scale / 100))) : percent;
+  const r = await setParam(key, dv);
+  if (r && !r.error) { applyState({ ...cfg, ...r }); toast(label + ' ✓'); }
+  else toast((label || '设置') + ' 失败：' + (r.error || '?'));
+}
+const debounced = (fn, ms = 500) => { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; };
+const slider = (id, key, label, vid) => {
+  $(id).addEventListener('input', (e) => { if (vid) $(vid).textContent = e.target.value; });
+  $(id).addEventListener('change', (e) => act(key, +e.target.value, label));
+};
+$('#vol').addEventListener('input', (e) => { $('#volNum').textContent = e.target.value; });
+$('#vol').addEventListener('change', (e) => act('volume', +e.target.value, '音量'));
+slider('#light', 'light', '亮度', '#lightV');
+slider('#flow', 'colorFlowRate', '色彩流动速度', '#flowV');
+slider('#breath', 'breathingSpeed', '呼吸速度', '#breathV');
+slider('#agility', 'agilityOrColorFlag', '律动灵敏度', '#agilityV');
+slider('#chPrompt', 'channelPrompt', '提示音大小', '#chPromptV');
+slider('#sleepV', 'sleepValue', '睡眠时长', '#sleepVV');
+slider('#standbyV', 'standbyValue', '待机时长', '#standbyVV');
+const swBind = (id, key, label) => $(id).addEventListener('click', (e) => {
+  const el = e.currentTarget; el.classList.toggle('on');
+  act(key, el.classList.contains('on') ? 1 : 0, label);
+});
+swBind('#sw-rgb', 'rgbLightFlag', '灯效开关');
+swBind('#sw-ltone', 'lightToneFlag', '灯效提示音');
+swBind('#sw-chPromptFlag', 'channelPromptFlag', '通道提示音');
+swBind('#sw-mix', 'mixLineChannelFlag', '低音炮独立音量');
+swBind('#sw-sleep', 'sleepFlag', '睡眠');
+swBind('#sw-standby', 'standbyFlag', '待机');
+swBind('#sw-pn', 'powerNoticeFlag', '开/关机提示音');
+$('#fxGrid').addEventListener('click', (e) => { const el = e.target.closest('.fx'); if (el) act('lightEffectIndex', +el.dataset.v, '灯效 → ' + el.textContent.trim()); });
+$('#eqSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act('equalizerIndex', +b.dataset.v, '音效 → ' + b.textContent); });
+$('#chanSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act('channel', +b.dataset.v, '通道 → ' + b.textContent); });
+$('#syldSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act('syldColorIndex', +b.dataset.v, '律动颜色'); });
+const eqWrite = debounced(() => {
+  const vals = EQ_HZ.map((_, i) => +$('#eq'+i).value);
+  (async () => { const r = await transact(wEQ(vals)); r.error ? toast('EQ 失败：' + r.error) : toast('自定义 EQ ✓'); })();
+}, 600);
+EQ_HZ.forEach((_, i) => {
+  $('#eq'+i).addEventListener('input', () => { const v = +$('#eq'+i).value; $('#eqv'+i).textContent = (v > 0 ? '+' : '') + v; });
+  $('#eq'+i).addEventListener('change', eqWrite);
+});
+$('#btnRestart').addEventListener('click', async () => {
+  if (!confirm('确认重启音箱？')) return;
+  const r = await transact(wVal(115, 0));
+  toast(r.error ? '重启失败' : '重启命令已发送');
+});
+$('#btnReset').addEventListener('click', async () => {
+  if (!confirm('确认恢复出厂设置？所有自定义配置将被清除。')) return;
+  const r = await transact(wVal(114, 0));
+  toast(r.error ? '失败' : '恢复出厂已发送');
+  refresh();
+});
+
+// connection
+$('#btnConnect').addEventListener('click', async () => {
+  try {
+    const [dev] = await navigator.hid.requestDevice({ filters: PIDS.map((p) => ({ vendorId: VID, productId: p })) });
+    if (!dev) return;
+    await dev.open();
+    device = dev;
+    $('#devname').textContent = dev.productName || '已连接';
+    toast('已连接 ' + (dev.productName || ''));
+    refresh();
+  } catch (e) { toast('连接失败：' + (e.message || e)); }
+});
+device && device.addEventListener('disconnect', () => { device = null; $('#dot').classList.remove('on'); $('#devname').textContent = '设备已断开'; });
+
+async function refresh() {
+  if (!device || !device.opened) return;
+  const st = await readState();
+  if (st.error) { $('#dot').classList.remove('on'); $('#devname').textContent = '通信失败：' + st.error; return; }
+  applyState(st);
+}
+$('#btnRefresh').addEventListener('click', refresh);
+setInterval(refresh, 4000);
+// re-open previously granted device silently
+navigator.hid.getDevices?.().then(async (ds) => {
+  const dev = ds.find((d) => d.vendorId === VID && PIDS.includes(d.productId));
+  if (dev) { try { await dev.open(); device = dev; $('#devname').textContent = dev.productName || '已连接'; refresh(); } catch {} }
+});
+</script>
+</body>
+</html>
