@@ -138,6 +138,27 @@ class Speaker {
       }
     }));
   }
+  // Writes MUST go over the HID OUT report channel (HID.write) — the same
+  // channel the official app's sendReport uses. Writes sent as feature
+  // reports are silently IGNORED by the firmware (queries still work).
+  writeOut(frameArr) {
+    return (this.queue = this.queue.then(async () => {
+      if (!this.connect()) return { error: 'device not connected' };
+      try {
+        const out = Buffer.from([0x00, ...frameArr]); // report id 0 + frame
+        this.hid.write(out); // hidapi pads to the 257B OUT report size
+        await new Promise((r) => setTimeout(r, 120));
+        // read back the fresh state via the feature-report query channel
+        const resp = this.hid.getFeatureReport(0, 129);
+        const body = Buffer.from(resp).subarray(1);
+        console.log('[wx]', hexs(frameArr), '\n[rx]', hexs(body.subarray(0, Math.min(body.length, 96))));
+        return body;
+      } catch (e) {
+        this.close();
+        return { error: e.message };
+      }
+    }));
+  }
   async readState() {
     const r = await this.transact(buildQuery(0x90)); // A5 5A FC 03 90 03 00 16
     if (r.error) return r;
@@ -146,7 +167,7 @@ class Speaker {
     return cfg || { error: 'unparsable response', hex: hexs(r) };
   }
   async write(cmd, v) {
-    const r = await this.transact(buildWrite1(cmd, v));
+    const r = await this.writeOut(buildWrite1(cmd, v));
     if (r.error) return r;
     const cfg = parseState(r);
     if (cfg) this.lastCfg = cfg;
@@ -154,9 +175,11 @@ class Speaker {
   }
   async writeEQ(vals) {
     if (!Array.isArray(vals) || vals.length !== 10) return { error: 'EQ needs 10 values' };
-    const r = await this.transact(buildWriteEQ(vals));
+    const r = await this.writeOut(buildWriteEQ(vals));
     if (r.error) return r;
-    return { ok: true };
+    const cfg = parseState(r);
+    if (cfg) this.lastCfg = cfg;
+    return cfg || { ok: true };
   }
 }
 const speaker = new Speaker();
@@ -219,11 +242,11 @@ const server = createServer(async (req, res) => {
     }
   }
   if (url.pathname === '/api/restart' && req.method === 'POST') {
-    const out = await speaker.transact(buildWrite1(115, 0));
+    const out = await speaker.writeOut(buildWrite1(115, 0));
     return res.end(JSON.stringify({ ok: !out.error }));
   }
   if (url.pathname === '/api/factory-reset' && req.method === 'POST') {
-    const out = await speaker.transact(buildWrite1(114, 0));
+    const out = await speaker.writeOut(buildWrite1(114, 0));
     return res.end(JSON.stringify({ ok: !out.error }));
   }
   // static

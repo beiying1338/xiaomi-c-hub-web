@@ -222,6 +222,7 @@ function parseState(buf) {
 }
 
 let device = null, queue = Promise.resolve(), cfg = null, suppress = false;
+// Query/read: feature report (device responds with state frame, 129B total)
 const transact = (frameArr) => (queue = queue.then(async () => {
   if (!device || !device.opened) return { error: 'not connected' };
   try {
@@ -233,6 +234,22 @@ const transact = (frameArr) => (queue = queue.then(async () => {
     const dv = await device.receiveFeatureReport(0, 129);
     const body = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
     logLine('tx', hexs(frameArr)); logLine('rx', hexs(body.subarray(0, 64)) + (body.length > 64 ? ' …' : ''));
+    return body;
+  } catch (e) { return { error: String(e.message || e) }; }
+}));
+// WRITE: HID OUT report (device.sendReport) — the channel the official app
+// uses for every write command. Writes sent as feature reports are silently
+// ignored by the firmware. Verified on hardware: EXACT-length frames work
+// (no padding needed for output reports, unlike feature reports).
+const writeOut = (frameArr) => (queue = queue.then(async () => {
+  if (!device || !device.opened) return { error: 'not connected' };
+  try {
+    await device.sendReport(0, new Uint8Array(frameArr));
+    await new Promise((r) => setTimeout(r, 150));
+    // fresh state comes back on the feature-report query channel
+    const dv = await device.receiveFeatureReport(0, 129);
+    const body = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    logLine('wx', hexs(frameArr)); logLine('rx', hexs(body.subarray(0, 64)) + (body.length > 64 ? ' …' : ''));
     return body;
   } catch (e) { return { error: String(e.message || e) }; }
 }));
@@ -251,7 +268,7 @@ async function setParam(key, deviceVal) {
     channel:CMD.CHANNEL, channelPromptFlag:CMD.CHANNEL_TONE_FLAG, channelPrompt:CMD.CHANNEL_TONE,
     agilityOrColorFlag:CMD.AGILITY_COLOR, syldColorIndex:CMD.SYLD_COLOR, colorFlowRate:CMD.COLOR_FLOW,
     breathingSpeed:CMD.BREATHING, powerNoticeFlag:CMD.POWER_NOTICE, mixLineChannelFlag:CMD.MIX_LINE };
-  const r = await transact(wVal(map[key], deviceVal));
+  const r = await writeOut(wVal(map[key], deviceVal));
   const c = r.error ? r : (parseState(r) || { ok: true });
   if (!c.error) cfg = { ...cfg, ...c };
   return c;
@@ -346,7 +363,7 @@ $('#chanSeg').addEventListener('click', (e) => { const b = e.target.closest('but
 $('#syldSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act('syldColorIndex', +b.dataset.v, '律动颜色'); });
 const eqWrite = debounced(() => {
   const vals = EQ_HZ.map((_, i) => +$('#eq'+i).value);
-  (async () => { const r = await transact(wEQ(vals)); r.error ? toast('EQ 失败：' + r.error) : toast('自定义 EQ ✓'); })();
+  (async () => { const r = await writeOut(wEQ(vals)); r.error ? toast('EQ 失败：' + r.error) : toast('自定义 EQ ✓'); })();
 }, 600);
 EQ_HZ.forEach((_, i) => {
   $('#eq'+i).addEventListener('input', () => { const v = +$('#eq'+i).value; $('#eqv'+i).textContent = (v > 0 ? '+' : '') + v; });
@@ -354,12 +371,12 @@ EQ_HZ.forEach((_, i) => {
 });
 $('#btnRestart').addEventListener('click', async () => {
   if (!confirm('确认重启音箱？')) return;
-  const r = await transact(wVal(115, 0));
+  const r = await writeOut(wVal(115, 0));
   toast(r.error ? '重启失败' : '重启命令已发送');
 });
 $('#btnReset').addEventListener('click', async () => {
   if (!confirm('确认恢复出厂设置？所有自定义配置将被清除。')) return;
-  const r = await transact(wVal(114, 0));
+  const r = await writeOut(wVal(114, 0));
   toast(r.error ? '失败' : '恢复出厂已发送');
   refresh();
 });
