@@ -1,0 +1,16 @@
+# Xiaomi/Redmi desktop speaker (B03 family, VID 2717)
+# Gives world read/write on the speaker's vendor HID nodes and pins a stable
+# symlink /dev/chub-speaker for container device mapping.
+#
+# Install:
+#   sudo cp 99-chub-speaker.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload && sudo udevadm trigger
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d003", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d004", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d007", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d008", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d009", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d00a", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d00b", MODE="0666", SYMLINK+="chub-speaker"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2717", ATTRS{idProduct}=="d00c", MODE="0666", SYMLINK+="chub-speaker"

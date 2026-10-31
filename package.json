@@ -1,0 +1,14 @@
+{
+  "name": "xiaomi-c-hub-web",
+  "version": "1.0.0",
+  "description": "Web driver manager for Xiaomi/Redmi desktop speakers (B03 family) — reverse-engineered HID protocol",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "node-hid": "3.2.0"
+  },
+  "license": "MIT"
+}

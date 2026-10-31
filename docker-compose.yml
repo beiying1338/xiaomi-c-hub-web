@@ -1,0 +1,26 @@
+services:
+  chub-web:
+    build: .
+    image: xiaomi-c-hub-web:latest
+    container_name: chub-web
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      # Optional access token. When set, every /api request must send
+      # "Authorization: Bearer <token>" — the web UI prompts for it.
+      - CHUB_TOKEN=${CHUB_TOKEN:-}
+      # Enable only if you want other origins (e.g. a separately hosted UI)
+      # to call this bridge directly instead of through a reverse proxy:
+      # - CHUB_CORS=1
+    devices:
+      # The speaker's vendor HID interface. Find your node with:
+      #   ./scripts/find-hidraw.sh
+      # and edit the mapping below. Replug-safe alternative:
+      # install scripts/99-chub-speaker.rules, run
+      #   sudo udevadm control --reload && sudo udevadm trigger
+      # then map the stable symlink instead:
+      #   - "/dev/chub-speaker:/dev/chub-speaker"
+      - "/dev/hidraw5:/dev/hidraw5"
+    # Simplest (but least locked-down) alternative on a home server:
+    # privileged: true
