@@ -225,10 +225,13 @@ let device = null, queue = Promise.resolve(), cfg = null, suppress = false;
 const transact = (frameArr) => (queue = queue.then(async () => {
   if (!device || !device.opened) return { error: 'not connected' };
   try {
-    await device.sendFeatureReport(0, new Uint8Array(frameArr));
+    // Device feature report size = 128 data bytes (129 with report id).
+    // Chrome does NOT pad short writes — Windows HID rejects them with
+    // "Failed to write the feature report". Pad every frame to 128.
+    const padded = [...frameArr, ...Array(128 - frameArr.length).fill(0)];
+    await device.sendFeatureReport(0, new Uint8Array(padded));
     const dv = await device.receiveFeatureReport(0, 129);
     const body = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
-    console.log('[tx]', hexs(frameArr), '\n[rx]', hexs(body.subarray(0, 96)));
     logLine('tx', hexs(frameArr)); logLine('rx', hexs(body.subarray(0, 64)) + (body.length > 64 ? ' …' : ''));
     return body;
   } catch (e) { return { error: String(e.message || e) }; }
@@ -362,18 +365,30 @@ $('#btnReset').addEventListener('click', async () => {
 });
 
 // connection
+const isVendorIface = (d) => d.collections && d.collections.some((c) => c.usagePage === 0xff00);
+async function useDevice(dev) {
+  if (!dev.opened) await dev.open();
+  device = dev;
+  $('#devname').textContent = (dev.productName || '已连接') + ' · WebHID';
+  refresh();
+}
 $('#btnConnect').addEventListener('click', async () => {
   try {
     const [dev] = await navigator.hid.requestDevice({ filters: PIDS.map((p) => ({ vendorId: VID, productId: p })) });
     if (!dev) return;
-    await dev.open();
-    device = dev;
-    $('#devname').textContent = dev.productName || '已连接';
+    // two interfaces share the product name; we need the vendor one (0xFF00)
+    if (!isVendorIface(dev)) {
+      const alt = (await navigator.hid.getDevices()).find((d) => d.vendorId === VID && PIDS.includes(d.productId) && isVendorIface(d));
+      if (!alt) { toast('选择的是媒体键接口 —— 请重新连接并选择另一个同名设备'); return; }
+      dev = alt;
+    }
+    await useDevice(dev);
     toast('已连接 ' + (dev.productName || ''));
-    refresh();
   } catch (e) { toast('连接失败：' + (e.message || e)); }
 });
-device && device.addEventListener('disconnect', () => { device = null; $('#dot').classList.remove('on'); $('#devname').textContent = '设备已断开'; });
+navigator.hid.addEventListener?.('disconnect', (e) => {
+  if (e.device === device) { device = null; $('#dot').classList.remove('on'); $('#devname').textContent = '设备已断开'; }
+});
 
 async function refresh() {
   if (!device || !device.opened) return;
@@ -383,10 +398,10 @@ async function refresh() {
 }
 $('#btnRefresh').addEventListener('click', refresh);
 setInterval(refresh, 4000);
-// re-open previously granted device silently
+// re-open previously granted vendor interface silently
 navigator.hid.getDevices?.().then(async (ds) => {
-  const dev = ds.find((d) => d.vendorId === VID && PIDS.includes(d.productId));
-  if (dev) { try { await dev.open(); device = dev; $('#devname').textContent = dev.productName || '已连接'; refresh(); } catch {} }
+  const dev = ds.find((d) => d.vendorId === VID && PIDS.includes(d.productId) && isVendorIface(d));
+  if (dev) { try { await useDevice(dev); } catch {} }
 });
 </script>
 </body>
